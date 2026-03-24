@@ -1,0 +1,53 @@
+{
+  "zones": [
+    {"zone_id": "Z01", "zone_name": "North Residential", "bin_ids": [], "serviced_today": false},
+    {"zone_id": "Z02", "zone_name": "South Commercial",  "bin_ids": [], "serviced_today": false},
+    {"zone_id": "Z03", "zone_name": "East Industrial",   "bin_ids": [], "serviced_today": false},
+    {"zone_id": "Z04", "zone_name": "West Market",       "bin_ids": [], "serviced_today": false},
+    {"zone_id": "Z05", "zone_name": "Central Park",      "bin_ids": [], "serviced_today": false}
+  ],
+  "vehicles": [
+    {
+      "vehicle_id": "VH-001", "vehicle_type": "Compactor",
+      "max_capacity_kg": 2000, "fuel_tank_capacity": 80,
+      "fuel_consumption_rate": 0.18, "assigned_zone": "North Residential",
+      "driver_id": "DR-001", "available": true, "current_load_kg": 0,
+      "current_fuel": 80, "odometer_km": 120, "needs_maintenance": false, "route_assigned": false
+    },
+    {
+      "vehicle_id": "VH-002", "vehicle_type": "Standard",
+      "max_capacity_kg": 1200, "fuel_tank_capacity": 60,
+      "fuel_consumption_rate": 0.14, "assigned_zone": "South Commercial",
+      "driver_id": "DR-002", "available": true, "current_load_kg": 0,
+      "current_fuel": 60, "odometer_km": 80, "needs_maintenance": false, "route_assigned": false
+    },
+    {
+      "vehicle_id": "VH-003", "vehicle_type": "HazMat",
+      "max_capacity_kg": 800, "fuel_tank_capacity": 70,
+      "fuel_consumption_rate": 0.22, "assigned_zone": "East Industrial",
+      "driver_id": "DR-003", "available": true, "current_load_kg": 0,
+      "current_fuel": 70, "odometer_km": 200, "needs_maintenance": false, "route_assigned": false
+    },
+    {
+      "vehicle_id": "VH-004", "vehicle_type": "Mini",
+      "max_capacity_kg": 600, "fuel_tank_capacity": 45,
+      "fuel_consumption_rate": 0.10, "assigned_zone": "West Market",
+      "driver_id": "DR-004", "available": true, "current_load_kg": 0,
+      "current_fuel": 45, "odometer_km": 350, "needs_maintenance": false, "route_assigned": false
+    },
+    {
+      "vehicle_id": "VH-005", "vehicle_type": "Compactor",
+      "max_capacity_kg": 1800, "fuel_tank_capacity": 75,
+      "fuel_consumption_rate": 0.16, "assigned_zone": "Central Park",
+      "driver_id": "DR-005", "available": true, "current_load_kg": 0,
+      "current_fuel": 75, "odometer_km": 460, "needs_maintenance": false, "route_assigned": false
+    }
+  ],
+  "drivers": [
+    {"driver_id": "DR-001", "name": "Rajan Kumar",    "assigned_vehicle": "VH-001", "max_working_hours": 8, "shift_start": "06:00", "shift_end": "14:00", "salary_per_hour": 180, "hours_worked": 0, "overtime_hours": 0, "active": true},
+    {"driver_id": "DR-002", "name": "Priya Nair",     "assigned_vehicle": "VH-002", "max_working_hours": 8, "shift_start": "07:00", "shift_end": "15:00", "salary_per_hour": 175, "hours_worked": 0, "overtime_hours": 0, "active": true},
+    {"driver_id": "DR-003", "name": "Suresh Pillai",  "assigned_vehicle": "VH-003", "max_working_hours": 8, "shift_start": "06:00", "shift_end": "14:00", "salary_per_hour": 220, "hours_worked": 0, "overtime_hours": 0, "active": true},
+    {"driver_id": "DR-004", "name": "Meena Devi",     "assigned_vehicle": "VH-004", "max_working_hours": 8, "shift_start": "08:00", "shift_end": "16:00", "salary_per_hour": 160, "hours_worked": 0, "overtime_hours": 0, "active": true},
+    {"driver_id": "DR-005", "name": "Arjun Sharma",   "assigned_vehicle": "VH-005", "max_working_hours": 8, "shift_start": "05:00", "shift_end": "13:00", "salary_per_hour": 195, "hours_worked": 0, "overtime_hours": 0, "active": true}
+  ]
+}

@@ -1,0 +1,1752 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>SmartWaste — Municipal Intelligence Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+/* ── CSS Variables ─────────────────────────────────────────────────────── */
+:root {
+  --bg:        #0a0e14;
+  --surface:   #111720;
+  --card:      #161d28;
+  --border:    #1e2d3d;
+  --accent:    #00e5a0;
+  --accent2:   #ff6b35;
+  --accent3:   #4d9fff;
+  --warn:      #ffcc00;
+  --danger:    #ff3d5a;
+  --text:      #c8d8e8;
+  --muted:     #5a7a9a;
+  --font-mono: 'Space Mono', monospace;
+  --font-body: 'DM Sans', sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 14px;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ── Scanline overlay ──────────────────────────────────────────────────── */
+body::before {
+  content:'';
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg, transparent, transparent 2px,
+    rgba(0,229,160,0.015) 2px, rgba(0,229,160,0.015) 4px
+  );
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* ── Header ────────────────────────────────────────────────────────────── */
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 28px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(17,23,32,0.95);
+  backdrop-filter: blur(12px);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.logo-icon {
+  width: 36px; height: 36px;
+  background: var(--accent);
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px;
+}
+
+.logo-text {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: 1px;
+}
+
+.logo-sub {
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 3px;
+  text-transform: uppercase;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.day-badge {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  padding: 4px 12px;
+  border-radius: 4px;
+  letter-spacing: 2px;
+}
+
+.status-dot {
+  width: 8px; height: 8px;
+  background: var(--accent);
+  border-radius: 50%;
+  box-shadow: 0 0 8px var(--accent);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%,100% { opacity:1; transform:scale(1); }
+  50%      { opacity:.5; transform:scale(1.4); }
+}
+
+/* ── Layout ────────────────────────────────────────────────────────────── */
+.app-layout {
+  display: grid;
+  grid-template-columns: 220px 1fr 280px;
+  grid-template-rows: auto 1fr;
+  min-height: calc(100vh - 61px);
+}
+
+/* ── Sidebar ───────────────────────────────────────────────────────────── */
+.sidebar {
+  grid-row: 1 / 3;
+  border-right: 1px solid var(--border);
+  padding: 20px 0;
+  background: var(--surface);
+}
+
+.nav-section {
+  padding: 8px 16px;
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  margin-top: 12px;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 20px;
+  cursor: pointer;
+  border-left: 3px solid transparent;
+  transition: all .2s;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.nav-item:hover, .nav-item.active {
+  background: rgba(0,229,160,0.05);
+  border-left-color: var(--accent);
+  color: var(--text);
+}
+
+.nav-item .icon { font-size: 16px; width: 20px; text-align: center; }
+
+/* ── Top Stats Bar ─────────────────────────────────────────────────────── */
+.stats-bar {
+  padding: 16px 24px;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.stat-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 16px;
+  position: relative;
+  overflow: hidden;
+}
+
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: var(--accent);
+}
+
+.stat-card.warn::before  { background: var(--warn); }
+.stat-card.danger::before { background: var(--danger); }
+.stat-card.blue::before  { background: var(--accent3); }
+.stat-card.orange::before { background: var(--accent2); }
+
+.stat-label {
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.stat-value {
+  font-family: var(--font-mono);
+  font-size: 22px;
+  color: #fff;
+  font-weight: 700;
+}
+
+.stat-sub {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 3px;
+}
+
+/* ── Main Content ──────────────────────────────────────────────────────── */
+.main-content {
+  padding: 20px;
+  overflow-y: auto;
+  max-height: calc(100vh - 61px - 80px);
+}
+
+/* ── Panels ────────────────────────────────────────────────────────────── */
+.panel { display: none; }
+.panel.active { display: block; }
+
+/* ── Section Title ─────────────────────────────────────────────────────── */
+.section-title {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--accent);
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* ── Cards Grid ────────────────────────────────────────────────────────── */
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+/* ── Bin Card ──────────────────────────────────────────────────────────── */
+.bin-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  position: relative;
+  overflow: hidden;
+  transition: transform .2s, border-color .2s;
+  cursor: default;
+}
+
+.bin-card:hover { transform: translateY(-2px); border-color: var(--accent); }
+
+.bin-card.critical  { border-color: rgba(255,204,0,0.4); }
+.bin-card.overflow  { border-color: var(--danger); box-shadow: 0 0 12px rgba(255,61,90,0.2); }
+.bin-card.collected { opacity: .55; }
+
+.bin-id {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--accent);
+  margin-bottom: 6px;
+}
+
+.bin-zone {
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.waste-badge {
+  display: inline-block;
+  font-size: 9px;
+  padding: 2px 7px;
+  border-radius: 3px;
+  margin-bottom: 10px;
+  font-family: var(--font-mono);
+  letter-spacing: 1px;
+}
+.waste-badge.Dry       { background: rgba(77,159,255,.15); color: var(--accent3); }
+.waste-badge.Wet       { background: rgba(0,229,160,.15);  color: var(--accent);  }
+.waste-badge.Mixed     { background: rgba(255,107,53,.15); color: var(--accent2); }
+.waste-badge.Hazardous { background: rgba(255,61,90,.15);  color: var(--danger);  }
+
+.fill-bar-wrap {
+  background: rgba(255,255,255,0.06);
+  border-radius: 3px;
+  height: 6px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+
+.fill-bar {
+  height: 100%;
+  border-radius: 3px;
+  transition: width .6s ease;
+}
+
+.fill-pct {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text);
+}
+
+.overflow-tag {
+  position: absolute;
+  top: 8px; right: 8px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 8px;
+  padding: 2px 5px;
+  border-radius: 3px;
+  font-family: var(--font-mono);
+  animation: blink 1s step-start infinite;
+}
+
+@keyframes blink { 50% { opacity: 0; } }
+
+.collected-tag {
+  position: absolute;
+  top: 8px; right: 8px;
+  background: var(--accent);
+  color: #000;
+  font-size: 8px;
+  padding: 2px 5px;
+  border-radius: 3px;
+  font-family: var(--font-mono);
+}
+
+/* ── Map Panel ─────────────────────────────────────────────────────────── */
+.map-container {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  position: relative;
+  overflow: hidden;
+  height: 420px;
+  margin-bottom: 20px;
+}
+
+.map-canvas {
+  width: 100%; height: 100%;
+}
+
+.map-legend {
+  position: absolute;
+  bottom: 12px; left: 12px;
+  display: flex; gap: 12px;
+  background: rgba(10,14,20,0.85);
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+.legend-item {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px; color: var(--muted);
+}
+
+.legend-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+}
+
+/* ── Table ─────────────────────────────────────────────────────────────── */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.data-table th {
+  text-align: left;
+  padding: 8px 12px;
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-weight: 400;
+}
+
+.data-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(30,45,61,.5);
+  color: var(--text);
+}
+
+.data-table tr:hover td { background: rgba(0,229,160,0.03); }
+
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-family: var(--font-mono);
+}
+
+.badge-green   { background: rgba(0,229,160,.15); color: var(--accent); }
+.badge-yellow  { background: rgba(255,204,0,.15);  color: var(--warn);   }
+.badge-red     { background: rgba(255,61,90,.15);  color: var(--danger); }
+.badge-blue    { background: rgba(77,159,255,.15); color: var(--accent3);}
+.badge-orange  { background: rgba(255,107,53,.15); color: var(--accent2);}
+
+/* ── Buttons ───────────────────────────────────────────────────────────── */
+.btn {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  padding: 9px 20px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  transition: all .2s;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: #000;
+  font-weight: 700;
+}
+.btn-primary:hover { background: #00ffb3; box-shadow: 0 0 16px rgba(0,229,160,.4); }
+
+.btn-danger {
+  background: transparent;
+  color: var(--danger);
+  border: 1px solid var(--danger);
+}
+.btn-danger:hover { background: rgba(255,61,90,.1); }
+
+.btn-outline {
+  background: transparent;
+  color: var(--accent3);
+  border: 1px solid var(--accent3);
+}
+.btn-outline:hover { background: rgba(77,159,255,.1); }
+
+.btn-warn {
+  background: transparent;
+  color: var(--warn);
+  border: 1px solid var(--warn);
+}
+.btn-warn:hover { background: rgba(255,204,0,.1); }
+
+.action-bar {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+/* ── Right Panel ───────────────────────────────────────────────────────── */
+.right-panel {
+  border-left: 1px solid var(--border);
+  background: var(--surface);
+  padding: 16px;
+  overflow-y: auto;
+  max-height: calc(100vh - 61px - 80px);
+}
+
+.rp-title {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+
+/* ── Log Feed ──────────────────────────────────────────────────────────── */
+.log-feed { display: flex; flex-direction: column; gap: 6px; }
+
+.log-item {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 11px;
+}
+
+.log-time {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--muted);
+  margin-bottom: 3px;
+}
+
+.log-msg { color: var(--text); }
+.log-emergency { border-color: var(--danger); }
+.log-emergency .log-time { color: var(--danger); }
+
+/* ── Vehicle Cards (right panel) ───────────────────────────────────────── */
+.vehicle-mini {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+}
+
+.vm-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.vm-id {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--accent);
+}
+
+.fuel-mini {
+  background: rgba(255,255,255,0.06);
+  height: 4px; border-radius: 2px;
+  overflow: hidden; margin-bottom: 4px;
+}
+
+.fuel-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: var(--accent3);
+  transition: width .5s;
+}
+
+.load-mini {
+  background: rgba(255,255,255,0.06);
+  height: 4px; border-radius: 2px; overflow: hidden;
+}
+
+.load-fill {
+  height: 100%; border-radius: 2px;
+  background: var(--accent2);
+  transition: width .5s;
+}
+
+.vm-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 9px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+/* ── Chart containers ──────────────────────────────────────────────────── */
+.chart-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.chart-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+}
+
+.chart-title {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+
+/* ── Toast ─────────────────────────────────────────────────────────────── */
+#toast {
+  position: fixed;
+  bottom: 24px; right: 24px;
+  background: var(--card);
+  border: 1px solid var(--accent);
+  color: var(--text);
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: var(--font-mono);
+  opacity: 0;
+  transform: translateY(20px);
+  transition: all .3s;
+  z-index: 9998;
+  max-width: 360px;
+}
+
+#toast.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+#toast.error { border-color: var(--danger); }
+#toast.warn  { border-color: var(--warn); }
+
+/* ── Loader ────────────────────────────────────────────────────────────── */
+.spinner {
+  display: inline-block;
+  width: 14px; height: 14px;
+  border: 2px solid rgba(0,229,160,0.2);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin .6s linear infinite;
+  vertical-align: middle;
+  margin-right: 6px;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Modal ─────────────────────────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.7);
+  z-index: 200;
+  display: none;
+  align-items: center; justify-content: center;
+}
+.modal-overlay.open { display: flex; }
+
+.modal {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px;
+  width: 420px;
+  max-width: 95vw;
+}
+
+.modal-title {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  color: var(--accent);
+  margin-bottom: 16px;
+  letter-spacing: 2px;
+}
+
+.form-group { margin-bottom: 12px; }
+
+.form-group label {
+  display: block;
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-bottom: 5px;
+}
+
+.form-group select,
+.form-group input {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  outline: none;
+}
+
+.form-group select:focus,
+.form-group input:focus { border-color: var(--accent); }
+
+.modal-actions {
+  display: flex; gap: 10px; margin-top: 16px; justify-content: flex-end;
+}
+
+/* ── Route Visualizer ──────────────────────────────────────────────────── */
+.route-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+
+.route-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 12px;
+}
+
+.route-path {
+  display: flex; align-items: center; gap: 6px;
+  flex-wrap: wrap; margin-bottom: 10px;
+}
+
+.route-node {
+  background: rgba(0,229,160,0.1);
+  border: 1px solid rgba(0,229,160,0.3);
+  color: var(--accent);
+  padding: 3px 9px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+}
+
+.route-node.start { background: rgba(77,159,255,0.1); border-color: var(--accent3); color: var(--accent3); }
+.route-node.end   { background: rgba(77,159,255,0.1); border-color: var(--accent3); color: var(--accent3); }
+
+.route-arrow { color: var(--muted); font-size: 12px; }
+
+.route-stats {
+  display: flex; gap: 16px; font-size: 11px; color: var(--muted);
+}
+
+.route-stat strong { color: var(--text); font-family: var(--font-mono); }
+
+/* ── Scrollbar ─────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+/* ── Report Panel ──────────────────────────────────────────────────────── */
+.report-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.report-box {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+}
+
+.report-box h3 {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  margin-bottom: 14px;
+}
+
+.kv-list { display: flex; flex-direction: column; gap: 8px; }
+
+.kv-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(30,45,61,.4);
+}
+
+.kv-key { font-size: 12px; color: var(--muted); }
+.kv-val { font-family: var(--font-mono); font-size: 13px; color: #fff; }
+
+/* ── Zone grid ─────────────────────────────────────────────────────────── */
+.zone-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.zone-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+}
+
+.zone-name {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--accent);
+  margin-bottom: 10px;
+}
+
+.zone-fill-ring {
+  width: 60px; height: 60px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  margin: 0 auto 10px;
+  position: relative;
+}
+
+.zone-stats {
+  display: flex; justify-content: space-between;
+  font-size: 11px; color: var(--muted);
+}
+</style>
+</head>
+<body>
+
+<!-- ── Header ──────────────────────────────────────────────────────────────── -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">♻</div>
+    <div>
+      <div class="logo-text">SMARTWASTE</div>
+      <div class="logo-sub">Municipal Intelligence Platform</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="day-badge" id="dayBadge">DAY 001</div>
+    <div class="status-dot"></div>
+  </div>
+</header>
+
+<!-- ── App Layout ──────────────────────────────────────────────────────────── -->
+<div class="app-layout">
+
+  <!-- Sidebar -->
+  <nav class="sidebar">
+    <div class="nav-section">Operations</div>
+    <div class="nav-item active" onclick="showPanel('overview')">
+      <span class="icon">📊</span> Overview
+    </div>
+    <div class="nav-item" onclick="showPanel('bins')">
+      <span class="icon">🗑</span> Bin Monitor
+    </div>
+    <div class="nav-item" onclick="showPanel('vehicles')">
+      <span class="icon">🚛</span> Fleet
+    </div>
+
+    <div class="nav-section">Planning</div>
+    <div class="nav-item" onclick="showPanel('schedule')">
+      <span class="icon">📋</span> Schedule
+    </div>
+    <div class="nav-item" onclick="showPanel('routes')">
+      <span class="icon">🗺</span> Routes
+    </div>
+
+    <div class="nav-section">Simulation</div>
+    <div class="nav-item" onclick="showPanel('simulation')">
+      <span class="icon">▶</span> Run Sim
+    </div>
+    <div class="nav-item" onclick="showPanel('emergency')">
+      <span class="icon">🚨</span> Emergency
+    </div>
+
+    <div class="nav-section">Analytics</div>
+    <div class="nav-item" onclick="showPanel('reports')">
+      <span class="icon">📈</span> Reports
+    </div>
+    <div class="nav-item" onclick="showPanel('zones')">
+      <span class="icon">🏙</span> Zones
+    </div>
+  </nav>
+
+  <!-- Stats Bar + Main -->
+  <div style="display:flex; flex-direction:column; min-height:0;">
+
+    <!-- Top Stats -->
+    <div class="stats-bar">
+      <div class="stat-card">
+        <div class="stat-label">Total Bins</div>
+        <div class="stat-value" id="statTotalBins">—</div>
+        <div class="stat-sub">across all zones</div>
+      </div>
+      <div class="stat-card warn">
+        <div class="stat-label">Critical</div>
+        <div class="stat-value" id="statCritical">—</div>
+        <div class="stat-sub">≥70% fill level</div>
+      </div>
+      <div class="stat-card danger">
+        <div class="stat-label">Overflow</div>
+        <div class="stat-value" id="statOverflow">—</div>
+        <div class="stat-sub">emergency bins</div>
+      </div>
+      <div class="stat-card blue">
+        <div class="stat-label">Fleet Active</div>
+        <div class="stat-value" id="statVehicles">—</div>
+        <div class="stat-sub">vehicles available</div>
+      </div>
+      <div class="stat-card orange">
+        <div class="stat-label">Collected Today</div>
+        <div class="stat-value" id="statCollected">—</div>
+        <div class="stat-sub">bins serviced</div>
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content" id="mainContent">
+
+      <!-- OVERVIEW -->
+      <div class="panel active" id="panel-overview">
+        <div class="section-title">// System Map — Live Zone View</div>
+        <div class="map-container">
+          <canvas class="map-canvas" id="mapCanvas"></canvas>
+          <div class="map-legend">
+            <div class="legend-item"><div class="legend-dot" style="background:#00e5a0"></div> Normal</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#ffcc00"></div> Critical</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#ff3d5a"></div> Overflow</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#4d9fff"></div> Vehicle</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#555"></div> Collected</div>
+          </div>
+        </div>
+
+        <div class="chart-grid">
+          <div class="chart-card">
+            <div class="chart-title">Fill Level Distribution</div>
+            <canvas id="fillChart" height="160"></canvas>
+          </div>
+          <div class="chart-card">
+            <div class="chart-title">Waste Type Breakdown</div>
+            <canvas id="wasteChart" height="160"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- BINS -->
+      <div class="panel" id="panel-bins">
+        <div class="section-title">// Bin Monitor — Real-time Fill Levels</div>
+        <div class="action-bar">
+          <button class="btn btn-outline" onclick="openAddBinModal()">+ Add Bin</button>
+          <button class="btn btn-warn" onclick="filterCritical()">⚠ Critical Only</button>
+          <button class="btn" style="background:transparent;border:1px solid var(--border);color:var(--muted)" onclick="loadSnapshot()">↻ Refresh</button>
+        </div>
+        <div class="cards-grid" id="binsGrid">
+          <div style="color:var(--muted);font-size:12px">Loading bins…</div>
+        </div>
+      </div>
+
+      <!-- VEHICLES -->
+      <div class="panel" id="panel-vehicles">
+        <div class="section-title">// Fleet Management</div>
+        <div class="action-bar">
+          <button class="btn btn-outline" onclick="refuelAll()">⛽ Refuel All</button>
+          <button class="btn btn-warn" onclick="clearAllMaintenance()">🔧 Clear Maintenance</button>
+        </div>
+        <table class="data-table" id="vehiclesTable">
+          <thead>
+            <tr>
+              <th>Vehicle ID</th><th>Type</th><th>Zone</th><th>Driver</th>
+              <th>Load</th><th>Fuel</th><th>Odometer</th><th>Status</th><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="vehiclesTbody"></tbody>
+        </table>
+      </div>
+
+      <!-- SCHEDULE -->
+      <div class="panel" id="panel-schedule">
+        <div class="section-title">// Collection Schedule</div>
+        <div class="action-bar">
+          <button class="btn btn-primary" onclick="generateSchedule()">
+            <span id="scheduleSpinner" style="display:none" class="spinner"></span>
+            Generate Schedule
+          </button>
+        </div>
+        <table class="data-table" id="scheduleTable">
+          <thead>
+            <tr>
+              <th>Bin ID</th><th>Zone</th><th>Waste Type</th><th>Load (kg)</th>
+              <th>Vehicle</th><th>Driver</th><th>Distance (km)</th><th>Emergency</th><th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="scheduleTbody"><tr><td colspan="9" style="color:var(--muted);text-align:center;padding:20px">Generate a schedule to view assignments</td></tr></tbody>
+        </table>
+      </div>
+
+      <!-- ROUTES -->
+      <div class="panel" id="panel-routes">
+        <div class="section-title">// Optimised Route Plans</div>
+        <div class="action-bar">
+          <button class="btn btn-primary" onclick="generateSchedule()">Compute Routes</button>
+        </div>
+        <div id="routesContainer">
+          <div style="color:var(--muted);font-size:12px;padding:20px 0">Generate a schedule first to see optimised routes.</div>
+        </div>
+      </div>
+
+      <!-- SIMULATION -->
+      <div class="panel" id="panel-simulation">
+        <div class="section-title">// Waste Collection Simulation</div>
+        <div class="action-bar">
+          <button class="btn btn-primary" onclick="runSimulation()">
+            <span id="simSpinner" style="display:none" class="spinner"></span>
+            ▶ Run Full Day
+          </button>
+          <button class="btn btn-outline" onclick="advanceDay()">⏭ Next Day</button>
+        </div>
+        <div id="simResults" style="color:var(--muted);font-size:12px;padding:10px 0">
+          Click "Run Full Day" to simulate collection for all scheduled bins.
+        </div>
+        <div id="simTable" style="display:none">
+          <div class="section-title" style="margin-top:16px">// Collection Log</div>
+          <table class="data-table">
+            <thead>
+              <tr><th>Log ID</th><th>Bin</th><th>Vehicle</th><th>Zone</th>
+              <th>Waste</th><th>kg</th><th>Distance</th><th>Fuel Used</th><th>Time</th></tr>
+            </thead>
+            <tbody id="simTbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- EMERGENCY -->
+      <div class="panel" id="panel-emergency">
+        <div class="section-title">// Emergency Overflow Handler</div>
+        <div style="background:rgba(255,61,90,0.05); border:1px solid rgba(255,61,90,0.2); border-radius:10px; padding:20px; margin-bottom:20px;">
+          <p style="color:var(--text);margin-bottom:14px;font-size:13px;">Trigger an emergency overflow event. The system will immediately dispatch the nearest available vehicle, overriding the normal schedule.</p>
+          <div class="action-bar">
+            <button class="btn btn-danger" onclick="triggerEmergency()">
+              🚨 Trigger Emergency
+            </button>
+          </div>
+        </div>
+        <div id="emergencyResult"></div>
+        <div class="section-title" style="margin-top:10px">// Current Emergency Bins</div>
+        <div id="emergencyBins" style="color:var(--muted);font-size:12px">No overflow bins detected.</div>
+      </div>
+
+      <!-- REPORTS -->
+      <div class="panel" id="panel-reports">
+        <div class="section-title">// Operational Reports</div>
+        <div class="action-bar">
+          <button class="btn btn-outline" onclick="loadReports()">↻ Refresh Reports</button>
+        </div>
+        <div class="report-grid" id="reportGrid">
+          <div style="color:var(--muted)">Run a simulation first to generate reports.</div>
+        </div>
+        <div class="chart-grid" style="margin-top:0">
+          <div class="chart-card">
+            <div class="chart-title">Recycling Breakdown (kg)</div>
+            <canvas id="recycleChart" height="180"></canvas>
+          </div>
+          <div class="chart-card">
+            <div class="chart-title">Cost Breakdown</div>
+            <canvas id="costChart" height="180"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- ZONES -->
+      <div class="panel" id="panel-zones">
+        <div class="section-title">// Zone-wise Analysis</div>
+        <div class="zone-grid" id="zonesGrid">
+          <div style="color:var(--muted)">Loading…</div>
+        </div>
+      </div>
+
+    </div><!-- /main-content -->
+  </div>
+
+  <!-- Right Panel -->
+  <div class="right-panel">
+    <div class="rp-title">Fleet Status</div>
+    <div id="vehiclesMini"></div>
+    <div class="rp-title" style="margin-top:20px">Activity Log</div>
+    <div class="log-feed" id="logFeed">
+      <div class="log-item">
+        <div class="log-time">SYSTEM</div>
+        <div class="log-msg">SmartWaste dashboard initialised.</div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /app-layout -->
+
+<!-- ── Add Bin Modal ────────────────────────────────────────────────────────── -->
+<div class="modal-overlay" id="addBinModal">
+  <div class="modal">
+    <div class="modal-title">// ADD NEW BIN</div>
+    <div class="form-group">
+      <label>Zone</label>
+      <select id="newBinZone"></select>
+    </div>
+    <div class="form-group">
+      <label>Waste Type</label>
+      <select id="newBinWaste">
+        <option>Dry</option><option>Wet</option><option>Mixed</option><option>Hazardous</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Fill Level (%)</label>
+      <input type="number" id="newBinFill" value="50" min="0" max="100"/>
+    </div>
+    <div class="form-group">
+      <label>Capacity (kg)</label>
+      <input type="number" id="newBinCap" value="300" min="50"/>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" style="background:transparent;border:1px solid var(--border);color:var(--muted)" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="submitAddBin()">Add Bin</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Toast ────────────────────────────────────────────────────────────────── -->
+<div id="toast"></div>
+
+<script>
+// ── State ─────────────────────────────────────────────────────────────────────
+let state = { bins:[], vehicles:[], zones:[], schedule:[], logs:[], day:1 };
+let fillChart, wasteChart, recycleChart, costChart;
+let mapCtx;
+let showCriticalOnly = false;
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+window.addEventListener('load', async () => {
+  await loadSnapshot();
+  initCharts();
+  drawMap();
+  setInterval(async () => {
+    if (document.getElementById('panel-overview').classList.contains('active')) {
+      await loadSnapshot();
+      drawMap();
+    }
+  }, 10000);
+});
+
+// ── Navigation ────────────────────────────────────────────────────────────────
+function showPanel(name) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('panel-' + name).classList.add('active');
+  event.currentTarget.classList.add('active');
+
+  if (name === 'bins') renderBins();
+  if (name === 'vehicles') renderVehicles();
+  if (name === 'zones') renderZones();
+  if (name === 'reports') loadReports();
+  if (name === 'emergency') renderEmergencyBins();
+  if (name === 'overview') { drawMap(); updateCharts(); }
+}
+
+// ── API helpers ───────────────────────────────────────────────────────────────
+async function api(path, method='GET', body=null) {
+  const opts = { method, headers: {'Content-Type':'application/json'} };
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch(path, opts);
+  return r.json();
+}
+
+// ── Load Snapshot ─────────────────────────────────────────────────────────────
+async function loadSnapshot() {
+  const data = await api('/api/snapshot');
+  state = data;
+  updateStats();
+  updateVehiclesMini();
+  document.getElementById('dayBadge').textContent = `DAY ${String(data.day).padStart(3,'0')}`;
+}
+
+function updateStats() {
+  document.getElementById('statTotalBins').textContent = state.bins.length;
+  document.getElementById('statCritical').textContent = state.bins.filter(b=>b.is_critical).length;
+  document.getElementById('statOverflow').textContent = state.bins.filter(b=>b.overflow).length;
+  document.getElementById('statVehicles').textContent = state.vehicles.filter(v=>v.available && !v.needs_maintenance).length;
+  document.getElementById('statCollected').textContent = state.bins.filter(b=>b.collected_today).length;
+}
+
+// ── Map Drawing ────────────────────────────────────────────────────────────────
+function drawMap() {
+  const canvas = document.getElementById('mapCanvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  canvas.width = canvas.offsetWidth;
+  canvas.height = canvas.offsetHeight;
+  const W = canvas.width, H = canvas.height;
+
+  ctx.clearRect(0,0,W,H);
+
+  // Grid
+  ctx.strokeStyle = 'rgba(30,45,61,0.5)';
+  ctx.lineWidth = 1;
+  for (let x=0; x<W; x+=40) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+  for (let y=0; y<H; y+=40) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+
+  const toCanvas = (x,y) => [x/100*W, y/100*H];
+
+  // Draw zone connections
+  if (state.zones.length > 1) {
+    ctx.strokeStyle = 'rgba(30,45,61,0.7)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4,4]);
+    for (let i=0; i<state.zones.length; i++) {
+      for (let j=i+1; j<state.zones.length; j++) {
+        const [x1,y1] = toCanvas(state.zones[i].x, state.zones[i].y);
+        const [x2,y2] = toCanvas(state.zones[j].x, state.zones[j].y);
+        ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+      }
+    }
+    ctx.setLineDash([]);
+  }
+
+  // Draw bins
+  state.bins.forEach(b => {
+    const [cx,cy] = toCanvas(b.x, b.y);
+    const jitter = hashJitter(b.bin_id);
+    const bx = cx + jitter.x * 30, by = cy + jitter.y * 30;
+
+    let color = '#00e5a0';
+    if (b.collected_today) color = '#444';
+    else if (b.overflow)   color = '#ff3d5a';
+    else if (b.is_critical) color = '#ffcc00';
+
+    const r = 7 + (b.fill_level / 100) * 5;
+    ctx.beginPath();
+    ctx.arc(bx, by, r, 0, Math.PI*2);
+    ctx.fillStyle = color + '33';
+    ctx.fill();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // pulse for overflow
+    if (b.overflow) {
+      ctx.beginPath();
+      ctx.arc(bx, by, r+4, 0, Math.PI*2);
+      ctx.strokeStyle = 'rgba(255,61,90,0.3)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+  });
+
+  // Draw vehicles
+  state.vehicles.forEach(v => {
+    const [cx,cy] = toCanvas(v.x, v.y);
+    const jitter = hashJitter(v.vehicle_id + 'v');
+    const vx = cx + jitter.x*20, vy = cy + jitter.y*20;
+
+    ctx.beginPath();
+    ctx.arc(vx, vy, 9, 0, Math.PI*2);
+    ctx.fillStyle = v.needs_maintenance ? '#ff6b35' : 'rgba(77,159,255,0.2)';
+    ctx.fill();
+    ctx.strokeStyle = v.needs_maintenance ? '#ff6b35' : '#4d9fff';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.fillStyle = '#fff';
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('🚛', vx, vy);
+  });
+
+  // Zone labels
+  state.zones.forEach(z => {
+    const [cx,cy] = toCanvas(z.x, z.y);
+    ctx.font = '700 10px "Space Mono"';
+    ctx.fillStyle = 'rgba(0,229,160,0.8)';
+    ctx.textAlign = 'center';
+    ctx.fillText(z.zone_name.split(' ')[0].toUpperCase(), cx, cy - 14);
+
+    // Fill ring
+    ctx.beginPath();
+    ctx.arc(cx, cy, 18, -Math.PI/2, -Math.PI/2 + (z.avg_fill/100)*Math.PI*2);
+    ctx.strokeStyle = z.avg_fill >= 70 ? '#ffcc00' : '#00e5a0';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+  });
+}
+
+function hashJitter(s) {
+  let h1 = 0, h2 = 0;
+  for (let i=0; i<s.length; i++) {
+    h1 = (h1 * 31 + s.charCodeAt(i)) & 0xffff;
+    h2 = (h2 * 37 + s.charCodeAt(i)) & 0xffff;
+  }
+  return { x: (h1/0xffff)*2-1, y: (h2/0xffff)*2-1 };
+}
+
+// ── Charts ────────────────────────────────────────────────────────────────────
+function initCharts() {
+  const chartDefaults = {
+    responsive: true,
+    plugins: { legend: { labels: { color: '#5a7a9a', font: { family: 'DM Sans', size: 11 } } } }
+  };
+
+  fillChart = new Chart(document.getElementById('fillChart'), {
+    type: 'bar',
+    data: { labels: ['0-25%','25-50%','50-70%','70-90%','90-100%'], datasets: [{
+      label: 'Bins',
+      data: [0,0,0,0,0],
+      backgroundColor: ['#00e5a055','#00e5a055','#ffcc0055','#ff6b3555','#ff3d5a55'],
+      borderColor:     ['#00e5a0', '#00e5a0', '#ffcc00', '#ff6b35', '#ff3d5a'],
+      borderWidth: 2, borderRadius: 4,
+    }]},
+    options: { ...chartDefaults, scales: {
+      x: { ticks: { color: '#5a7a9a' }, grid: { color: '#1e2d3d' } },
+      y: { ticks: { color: '#5a7a9a' }, grid: { color: '#1e2d3d' } }
+    }}
+  });
+
+  wasteChart = new Chart(document.getElementById('wasteChart'), {
+    type: 'doughnut',
+    data: { labels: ['Dry','Wet','Mixed','Hazardous'], datasets: [{
+      data: [0,0,0,0],
+      backgroundColor: ['#4d9fff55','#00e5a055','#ff6b3555','#ff3d5a55'],
+      borderColor:     ['#4d9fff','#00e5a0','#ff6b35','#ff3d5a'],
+      borderWidth: 2,
+    }]},
+    options: { ...chartDefaults }
+  });
+
+  updateCharts();
+}
+
+function updateCharts() {
+  if (!fillChart || !state.bins.length) return;
+
+  const buckets = [0,0,0,0,0];
+  state.bins.forEach(b => {
+    if (b.fill_level < 25) buckets[0]++;
+    else if (b.fill_level < 50) buckets[1]++;
+    else if (b.fill_level < 70) buckets[2]++;
+    else if (b.fill_level < 90) buckets[3]++;
+    else buckets[4]++;
+  });
+  fillChart.data.datasets[0].data = buckets;
+  fillChart.update();
+
+  const wt = {Dry:0, Wet:0, Mixed:0, Hazardous:0};
+  state.bins.forEach(b => { wt[b.waste_type] = (wt[b.waste_type]||0)+1; });
+  wasteChart.data.datasets[0].data = [wt.Dry, wt.Wet, wt.Mixed, wt.Hazardous];
+  wasteChart.update();
+}
+
+// ── Bins Render ───────────────────────────────────────────────────────────────
+function renderBins() {
+  const grid = document.getElementById('binsGrid');
+  let bins = state.bins;
+  if (showCriticalOnly) bins = bins.filter(b=>b.is_critical && !b.collected_today);
+
+  if (!bins.length) {
+    grid.innerHTML = '<div style="color:var(--muted)">No bins found.</div>';
+    return;
+  }
+
+  grid.innerHTML = bins.map(b => {
+    const pct = b.fill_level;
+    const color = b.overflow ? 'var(--danger)' : pct >= 70 ? 'var(--warn)' : pct >= 50 ? 'var(--accent2)' : 'var(--accent)';
+    const cls = b.overflow ? 'overflow' : b.is_critical ? 'critical' : b.collected_today ? 'collected' : '';
+    return `
+    <div class="bin-card ${cls}">
+      ${b.overflow ? '<div class="overflow-tag">OVERFLOW</div>' : ''}
+      ${b.collected_today && !b.overflow ? '<div class="collected-tag">DONE</div>' : ''}
+      <div class="bin-id">${b.bin_id}</div>
+      <div class="bin-zone">${b.zone}</div>
+      <div class="waste-badge ${b.waste_type}">${b.waste_type}</div>
+      <div class="fill-bar-wrap">
+        <div class="fill-bar" style="width:${pct}%;background:${color}"></div>
+      </div>
+      <div class="fill-pct">${pct.toFixed(1)}% · ${b.load_kg.toFixed(0)} kg</div>
+    </div>`;
+  }).join('');
+}
+
+function filterCritical() {
+  showCriticalOnly = !showCriticalOnly;
+  renderBins();
+}
+
+// ── Vehicles Render ───────────────────────────────────────────────────────────
+function renderVehicles() {
+  const tbody = document.getElementById('vehiclesTbody');
+  tbody.innerHTML = state.vehicles.map(v => {
+    const loadPct = (v.current_load_kg / v.max_capacity_kg * 100).toFixed(0);
+    const fuelPct = (v.current_fuel / v.fuel_tank * 100).toFixed(0);
+    let statusBadge = '<span class="badge badge-green">Available</span>';
+    if (v.needs_maintenance) statusBadge = '<span class="badge badge-red">Maintenance</span>';
+    else if (!v.available)   statusBadge = '<span class="badge badge-yellow">Busy</span>';
+
+    return `<tr>
+      <td><span style="font-family:var(--font-mono);color:var(--accent3)">${v.vehicle_id}</span></td>
+      <td><span class="badge badge-blue">${v.vehicle_type}</span></td>
+      <td style="font-size:11px;color:var(--muted)">${v.zone}</td>
+      <td style="font-family:var(--font-mono);font-size:11px;color:var(--muted)">${v.driver_id}</td>
+      <td>
+        <div class="load-mini"><div class="load-fill" style="width:${loadPct}%"></div></div>
+        <div style="font-size:10px;color:var(--muted)">${v.current_load_kg.toFixed(0)}/${v.max_capacity_kg} kg</div>
+      </td>
+      <td>
+        <div class="fuel-mini"><div class="fuel-fill" style="width:${fuelPct}%"></div></div>
+        <div style="font-size:10px;color:var(--muted)">${v.current_fuel.toFixed(0)}/${v.fuel_tank}L</div>
+      </td>
+      <td style="font-family:var(--font-mono);font-size:11px">${v.odometer_km} km</td>
+      <td>${statusBadge}</td>
+      <td>
+        <button class="btn btn-outline" style="padding:4px 10px;font-size:10px" onclick="refuelVehicle('${v.vehicle_id}')">⛽</button>
+        ${v.needs_maintenance ? `<button class="btn btn-warn" style="padding:4px 10px;font-size:10px;margin-left:4px" onclick="maintainVehicle('${v.vehicle_id}')">🔧</button>` : ''}
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Schedule ──────────────────────────────────────────────────────────────────
+async function generateSchedule() {
+  document.getElementById('scheduleSpinner').style.display = 'inline-block';
+  const data = await api('/api/schedule', 'POST', {threshold:70});
+  document.getElementById('scheduleSpinner').style.display = 'none';
+
+  state.schedule = data.schedule;
+  renderSchedule(data.schedule);
+  renderRoutes(data.routes);
+  toast(`Schedule generated: ${data.schedule.length} tasks`);
+  addLog(`Schedule generated — ${data.schedule.filter(t=>t.status==='Scheduled').length} bins assigned`);
+}
+
+function renderSchedule(schedule) {
+  const tbody = document.getElementById('scheduleTbody');
+  if (!schedule || !schedule.length) {
+    tbody.innerHTML = '<tr><td colspan="9" style="color:var(--muted);text-align:center;padding:20px">No critical bins to schedule.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = schedule.map(t => {
+    const statusCls = t.status==='Completed' ? 'badge-green' : t.status==='Scheduled' ? 'badge-blue' : t.status.includes('Failed') ? 'badge-red' : 'badge-yellow';
+    return `<tr>
+      <td><span style="font-family:var(--font-mono);font-size:11px;color:var(--accent)">${t.bin_id}</span></td>
+      <td style="font-size:11px">${t.zone}</td>
+      <td><span class="waste-badge ${t.waste_type}">${t.waste_type}</span></td>
+      <td style="font-family:var(--font-mono);font-size:11px">${t.kg.toFixed(1)}</td>
+      <td style="font-family:var(--font-mono);font-size:11px;color:var(--accent3)">${t.vehicle_id||'—'}</td>
+      <td style="font-family:var(--font-mono);font-size:11px;color:var(--muted)">${t.driver_id||'—'}</td>
+      <td style="font-family:var(--font-mono);font-size:11px">${t.distance_km}</td>
+      <td>${t.emergency ? '<span class="badge badge-red">YES</span>' : '<span class="badge" style="background:transparent;color:var(--muted)">—</span>'}</td>
+      <td><span class="badge ${statusCls}">${t.status}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+function renderRoutes(routes) {
+  const container = document.getElementById('routesContainer');
+  if (!routes || !routes.length) {
+    container.innerHTML = '<div style="color:var(--muted);font-size:12px">No routes computed.</div>';
+    return;
+  }
+  container.innerHTML = routes.map(r => {
+    const pathHTML = r.path.map((zone, i) => {
+      const cls = (i===0 || i===r.path.length-1) ? 'start' : '';
+      return `<div class="route-node ${cls}">${zone.split(' ').map(w=>w[0]).join('')}</div>${i<r.path.length-1?'<div class="route-arrow">→</div>':''}`;
+    }).join('');
+    return `
+    <div class="route-card">
+      <div class="route-header">
+        <span style="font-family:var(--font-mono);color:var(--accent3);font-size:12px">${r.vehicle_id}</span>
+        <span style="font-size:11px;color:var(--muted)">${r.driver_id}</span>
+      </div>
+      <div class="route-path">${pathHTML}</div>
+      <div class="route-stats">
+        <span><strong>${r.total_km}</strong> km total</span>
+        <span><strong>${r.total_kg}</strong> kg waste</span>
+        <span><strong>${r.fuel_needed}L</strong> fuel needed</span>
+        <span><strong>₹${r.fuel_cost}</strong> fuel cost</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── Simulation ────────────────────────────────────────────────────────────────
+async function runSimulation() {
+  document.getElementById('simSpinner').style.display = 'inline-block';
+  document.getElementById('simResults').innerHTML = '<span class="spinner"></span> Simulating collection…';
+
+  const data = await api('/api/simulate', 'POST');
+  document.getElementById('simSpinner').style.display = 'none';
+
+  await loadSnapshot();
+  renderBins();
+  updateCharts();
+  drawMap();
+
+  if (!data.collected || !data.collected.length) {
+    document.getElementById('simResults').innerHTML = '<span style="color:var(--warn)">No collections performed. Generate a schedule first.</span>';
+    document.getElementById('simTable').style.display = 'none';
+    return;
+  }
+
+  document.getElementById('simResults').innerHTML = `
+    <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:12px">
+      <span class="badge badge-green">✓ ${data.collected.length} bins collected</span>
+      <span class="badge badge-blue">₹${data.cost_report.total_cost} total cost</span>
+      <span class="badge badge-orange">${data.cost_report.fuel_litres}L fuel used</span>
+      <span class="badge badge-green">${data.recycling_report.recycling_pct}% recycled</span>
+    </div>`;
+
+  document.getElementById('simTable').style.display = 'block';
+  document.getElementById('simTbody').innerHTML = data.collected.map(l =>
+    `<tr>
+      <td style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">${l.log_id}</td>
+      <td style="font-family:var(--font-mono);font-size:11px;color:var(--accent)">${l.bin_id}</td>
+      <td style="font-family:var(--font-mono);font-size:11px;color:var(--accent3)">${l.vehicle_id}</td>
+      <td style="font-size:11px">${l.zone}</td>
+      <td><span class="waste-badge ${l.waste_type}">${l.waste_type}</span></td>
+      <td style="font-family:var(--font-mono)">${l.kg_collected.toFixed(1)}</td>
+      <td style="font-family:var(--font-mono)">${l.distance_km}</td>
+      <td style="font-family:var(--font-mono)">${l.fuel_used.toFixed(2)}L</td>
+      <td style="font-size:10px;color:var(--muted)">${l.timestamp.split(' ')[1]}</td>
+    </tr>`
+  ).join('');
+
+  addLog(`Simulation complete — ${data.collected.length} bins collected · ₹${data.cost_report.total_cost}`);
+  toast('Simulation complete!');
+}
+
+async function advanceDay() {
+  const data = await api('/api/advance-day', 'POST');
+  await loadSnapshot();
+  renderBins();
+  drawMap();
+  updateCharts();
+  document.getElementById('simResults').textContent = `Day ${data.day} started. Bin fill levels updated.`;
+  document.getElementById('simTable').style.display = 'none';
+  addLog(`Advanced to ${data.message}`);
+  toast(data.message);
+}
+
+// ── Emergency ─────────────────────────────────────────────────────────────────
+async function triggerEmergency() {
+  const data = await api('/api/emergency', 'POST', {});
+  const box = document.getElementById('emergencyResult');
+  if (data.error) {
+    box.innerHTML = `<div class="badge badge-red" style="padding:8px 14px">${data.error}</div>`;
+    toast(data.error, 'error');
+    return;
+  }
+  box.innerHTML = `
+    <div style="background:rgba(255,61,90,0.07);border:1px solid rgba(255,61,90,0.3);border-radius:8px;padding:16px;margin-bottom:16px">
+      <div style="color:var(--danger);font-family:var(--font-mono);font-size:11px;margin-bottom:6px">🚨 EMERGENCY DISPATCHED</div>
+      <div style="font-size:12px;color:var(--text)">${data.message}</div>
+      <div style="margin-top:8px;font-size:11px;color:var(--muted)">
+        Bin: <strong style="color:var(--text)">${data.task.bin_id}</strong> &nbsp;|&nbsp;
+        Vehicle: <strong style="color:var(--accent3)">${data.task.vehicle_id}</strong> &nbsp;|&nbsp;
+        Distance: <strong style="color:var(--text)">${data.task.distance_km} km</strong>
+      </div>
+    </div>`;
+  await loadSnapshot();
+  renderEmergencyBins();
+  addLog(`🚨 Emergency: ${data.task.bin_id} → ${data.task.vehicle_id}`, true);
+  toast('Emergency dispatched!', 'warn');
+}
+
+function renderEmergencyBins() {
+  const cont = document.getElementById('emergencyBins');
+  const overflow = state.bins.filter(b=>b.overflow);
+  if (!overflow.length) {
+    cont.innerHTML = '<div style="color:var(--muted);font-size:12px">No overflow bins detected.</div>';
+    return;
+  }
+  cont.innerHTML = `<div class="cards-grid">${overflow.map(b=>`
+    <div class="bin-card overflow">
+      <div class="overflow-tag">OVERFLOW</div>
+      <div class="bin-id">${b.bin_id}</div>
+      <div class="bin-zone">${b.zone}</div>
+      <div class="waste-badge ${b.waste_type}">${b.waste_type}</div>
+      <div class="fill-bar-wrap"><div class="fill-bar" style="width:100%;background:var(--danger)"></div></div>
+      <div class="fill-pct">100.0% · ${b.load_kg.toFixed(0)} kg</div>
+    </div>`).join('')}</div>`;
+}
+
+// ── Reports ───────────────────────────────────────────────────────────────────
+async function loadReports() {
+  const [cost, recycle, zones] = await Promise.all([
+    api('/api/report/cost'),
+    api('/api/report/recycling'),
+    api('/api/report/zones'),
+  ]);
+
+  document.getElementById('reportGrid').innerHTML = `
+    <div class="report-box">
+      <h3>Cost Summary</h3>
+      <div class="kv-list">
+        <div class="kv-row"><span class="kv-key">Fuel Used</span><span class="kv-val">${cost.fuel_litres} L</span></div>
+        <div class="kv-row"><span class="kv-key">Fuel Cost</span><span class="kv-val">₹${cost.fuel_cost}</span></div>
+        <div class="kv-row"><span class="kv-key">Staff Cost</span><span class="kv-val">₹${cost.staff_cost}</span></div>
+        <div class="kv-row"><span class="kv-key">Total Cost</span><span class="kv-val" style="color:var(--accent)">₹${cost.total_cost}</span></div>
+        <div class="kv-row"><span class="kv-key">Collections</span><span class="kv-val">${cost.collections}</span></div>
+        <div class="kv-row"><span class="kv-key">Kg Collected</span><span class="kv-val">${cost.kg_collected} kg</span></div>
+      </div>
+    </div>
+    <div class="report-box">
+      <h3>Recycling Report</h3>
+      <div class="kv-list">
+        <div class="kv-row"><span class="kv-key">Total Waste</span><span class="kv-val">${recycle.total_kg} kg</span></div>
+        <div class="kv-row"><span class="kv-key">Recyclable</span><span class="kv-val" style="color:var(--accent)">${recycle.recyclable_kg} kg</span></div>
+        <div class="kv-row"><span class="kv-key">Landfill</span><span class="kv-val" style="color:var(--danger)">${recycle.landfill_kg} kg</span></div>
+        <div class="kv-row"><span class="kv-key">Efficiency</span><span class="kv-val" style="color:var(--accent)">${recycle.recycling_pct}%</span></div>
+        ${Object.entries(recycle.by_type||{}).map(([k,v])=>
+          `<div class="kv-row"><span class="kv-key">${k}</span><span class="kv-val">${v.toFixed(1)} kg</span></div>`
+        ).join('')}
+      </div>
+    </div>`;
+
+  // Recycling chart
+  if (recycleChart) recycleChart.destroy();
+  recycleChart = new Chart(document.getElementById('recycleChart'), {
+    type: 'bar',
+    data: {
+      labels: Object.keys(recycle.by_type||{}),
+      datasets: [{
+        label: 'kg collected',
+        data: Object.values(recycle.by_type||{}),
+        backgroundColor: ['#4d9fff55','#00e5a055','#ff6b3555','#ff3d5a55'],
+        borderColor: ['#4d9fff','#00e5a0','#ff6b35','#ff3d5a'],
+        borderWidth:2, borderRadius:4
+      }]
+    },
+    options: { responsive:true, plugins:{legend:{display:false}}, scales:{
+      x:{ticks:{color:'#5a7a9a'},grid:{color:'#1e2d3d'}},
+      y:{ticks:{color:'#5a7a9a'},grid:{color:'#1e2d3d'}}
+    }}
+  });
+
+  if (costChart) costChart.destroy();
+  costChart = new Chart(document.getElementById('costChart'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Fuel','Staff'],
+      datasets: [{
+        data: [cost.fuel_cost||0, cost.staff_cost||0],
+        backgroundColor: ['rgba(77,159,255,0.3)','rgba(255,107,53,0.3)'],
+        borderColor: ['#4d9fff','#ff6b35'], borderWidth:2
+      }]
+    },
+    options: { responsive:true, plugins:{legend:{labels:{color:'#5a7a9a',font:{size:11}}}} }
+  });
+}
+
+// ── Zones ─────────────────────────────────────────────────────────────────────
+function renderZones() {
+  const grid = document.getElementById('zonesGrid');
+  grid.innerHTML = state.zones.map(z => {
+    const fillColor = z.avg_fill >= 70 ? 'var(--warn)' : 'var(--accent)';
+    const bg = `conic-gradient(${fillColor} ${z.avg_fill*3.6}deg, rgba(255,255,255,0.06) 0deg)`;
+    return `
+    <div class="zone-card">
+      <div class="zone-name">${z.zone_name}</div>
+      <div class="zone-fill-ring" style="background:${bg}">
+        <div style="width:44px;height:44px;border-radius:50%;background:var(--card);display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:13px;color:${fillColor}">
+          ${z.avg_fill}%
+        </div>
+      </div>
+      <div class="zone-stats">
+        <span>🗑 ${z.bin_count} bins</span>
+        <span style="color:var(--warn)">⚠ ${z.critical_count}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── Right Panel Vehicles ───────────────────────────────────────────────────────
+function updateVehiclesMini() {
+  const cont = document.getElementById('vehiclesMini');
+  cont.innerHTML = state.vehicles.map(v => {
+    const fuelPct = (v.current_fuel/v.fuel_tank*100).toFixed(0);
+    const loadPct = (v.current_load_kg/v.max_capacity_kg*100).toFixed(0);
+    let badge = '<span class="badge badge-green" style="font-size:9px">OK</span>';
+    if (v.needs_maintenance) badge = '<span class="badge badge-red" style="font-size:9px">MAINT</span>';
+    return `
+    <div class="vehicle-mini">
+      <div class="vm-header">
+        <span class="vm-id">${v.vehicle_id}</span>${badge}
+      </div>
+      <div style="font-size:9px;color:var(--muted);margin-bottom:4px">FUEL</div>
+      <div class="fuel-mini"><div class="fuel-fill" style="width:${fuelPct}%"></div></div>
+      <div style="font-size:9px;color:var(--muted);margin-top:4px;margin-bottom:4px">LOAD</div>
+      <div class="load-mini"><div class="load-fill" style="width:${loadPct}%"></div></div>
+      <div class="vm-labels"><span>Fuel ${fuelPct}%</span><span>Load ${loadPct}%</span></div>
+    </div>`;
+  }).join('');
+}
+
+// ── Vehicle Actions ───────────────────────────────────────────────────────────
+async function refuelVehicle(vid) {
+  const d = await api('/api/vehicle/refuel', 'POST', {vehicle_id:vid});
+  toast(d.message || d.error);
+  await loadSnapshot();
+  renderVehicles();
+}
+
+async function maintainVehicle(vid) {
+  const d = await api('/api/vehicle/maintain', 'POST', {vehicle_id:vid});
+  toast(d.message || d.error);
+  await loadSnapshot();
+  renderVehicles();
+}
+
+async function refuelAll() {
+  for (const v of state.vehicles) await api('/api/vehicle/refuel','POST',{vehicle_id:v.vehicle_id});
+  await loadSnapshot(); renderVehicles();
+  toast('All vehicles refuelled');
+}
+
+async function clearAllMaintenance() {
+  for (const v of state.vehicles.filter(v=>v.needs_maintenance))
+    await api('/api/vehicle/maintain','POST',{vehicle_id:v.vehicle_id});
+  await loadSnapshot(); renderVehicles();
+  toast('Maintenance cleared');
+}
+
+// ── Add Bin Modal ─────────────────────────────────────────────────────────────
+function openAddBinModal() {
+  const sel = document.getElementById('newBinZone');
+  sel.innerHTML = state.zones.map(z=>`<option>${z.zone_name}</option>`).join('');
+  document.getElementById('addBinModal').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('addBinModal').classList.remove('open');
+}
+
+async function submitAddBin() {
+  const d = await api('/api/bin/add','POST',{
+    zone_name: document.getElementById('newBinZone').value,
+    waste_type: document.getElementById('newBinWaste').value,
+    fill_level: document.getElementById('newBinFill').value,
+    capacity_kg: document.getElementById('newBinCap').value,
+  });
+  if (d.error) { toast(d.error,'error'); return; }
+  closeModal();
+  await loadSnapshot();
+  renderBins();
+  toast(`Bin ${d.bin.bin_id} added`);
+}
+
+// ── Log + Toast ───────────────────────────────────────────────────────────────
+function addLog(msg, emergency=false) {
+  const feed = document.getElementById('logFeed');
+  const now = new Date().toLocaleTimeString('en-IN',{hour12:false});
+  const item = document.createElement('div');
+  item.className = `log-item${emergency?' log-emergency':''}`;
+  item.innerHTML = `<div class="log-time">${now}</div><div class="log-msg">${msg}</div>`;
+  feed.insertBefore(item, feed.firstChild);
+  if (feed.children.length > 30) feed.lastChild.remove();
+}
+
+let _toastTimer;
+function toast(msg, type='') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = `show${type?' '+type:''}`;
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(()=>el.classList.remove('show'), 3000);
+}
+</script>
+</body>
+</html>
